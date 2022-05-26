@@ -29,6 +29,9 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
 async function getChunkyCoreJar(run) {
   const artifacts = await (await fetch(run.artifacts_url, { headers })).json();
   const chunkyBuild = artifacts.artifacts.find((a) => a.name === "Chunky Core");
+  if (!chunkyBuild) {
+    return {};
+  }
 
   const body = await fetch(chunkyBuild.archive_download_url, { headers }).then(
     (res) => res.arrayBuffer()
@@ -74,6 +77,9 @@ app.get("/:number/lib/:filename", async (req, res) => {
       return res.status(404).end();
     }
     const { entry, zipFile } = await getChunkyCoreJar(run);
+    if (zipFile == null) {
+      return res.status(404).end();
+    }
 
     zipFile.openReadStream(entry, (err, stream) => {
       if (err) {
@@ -111,6 +117,9 @@ app.get("/:number/pr.json", async (req, res) => {
   }
 
   const { entry, zipFile } = await getChunkyCoreJar(run);
+  if (zipFile == null) {
+    return res.status(404).end();
+  }
 
   const digest = await new Promise((resolve) => {
     zipFile.openReadStream(entry, (err, stream) => {
