@@ -1,6 +1,6 @@
 # Serve Chunky PRs as update sites
 
-Installing PR builds is tricky for inexperienced users and plain impossible for non-GitHub users who can't download the artifacts. This project makes this very simple:
+Installing PR builds is tricky for inexperienced users and plain impossible for non-GitHub users who can't download the artifacts. This project makes this very simple by providing dynamic update sites for [Chunky PRs](https://github.com/chunky-dev/chunky/pulls).
 
 0. Make sure you're using Chunky Launcher v1.13.2 or later
 1. Enter `http://pr.chunky.lemaik.de/PR_NUMBER` as update site URL (replace PR_NUMBER by the PR number, eg. `http://pr.chunky.lemaik.de/1276`)
