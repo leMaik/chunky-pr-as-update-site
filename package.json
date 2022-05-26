@@ -1,0 +1,17 @@
+{
+  "name": "chunky-pr-as-update-site",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Maik Marschner <an@maik.tk>",
+  "license": "MIT",
+  "dependencies": {
+    "digest-stream": "^2.0.0",
+    "express": "^5.0.0-beta.1",
+    "node-stream-zip": "^1.15.0",
+    "yauzl": "^2.10.0"
+  }
+}
