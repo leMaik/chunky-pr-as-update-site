@@ -21,10 +21,19 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
     // PR not found
     return null;
   }
-  return workflows.workflow_runs.find((workflow) => {
-    return workflow.head_sha === pull.head.sha;
+  return workflows.workflow_runs.find((run) => {
+    return (
+      run.head_sha === pull.head.sha &&
+      run.status === "completed" &&
+      run.conclusion === "success"
+    );
   });
 };
+
+const getOpenPRs = () =>
+  fetch("https://api.github.com/repos/chunky-dev/chunky/pulls?state=open").then(
+    (res) => res.json()
+  );
 
 async function getChunkyCoreJar(run) {
   const artifacts = await (await fetch(run.artifacts_url, { headers })).json();
@@ -62,15 +71,15 @@ async function getChunkyCoreJar(run) {
 }
 
 const app = express();
-app.get("/:number/lib/:filename", async (req, res) => {
-  const number = req.params.number;
+app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
+  const number =
+    req.params.number || req.params.filename.match(/PR\.(\d+)/)?.[1];
   if (isNaN(parseInt(number, 10))) {
     return res.status(400).send("Invalid PR number");
   }
-
   if (
     req.params.filename.startsWith(`chunky-core-`) &&
-    req.params.filename.includes(`PR.${req.params.number}.`)
+    req.params.filename.includes(`PR.${number}.`)
   ) {
     const run = await getWorkflowRunsForPullRequest(number);
     if (run == null) {
@@ -179,5 +188,23 @@ app.get("/:number/launcher.json", async (req, res) => {
 });
 app.get("/:number/:filename", (req, res) => {
   res.redirect(301, `https://chunkyupdate.lemaik.de/${req.params.filename}`);
+});
+app.get("/launcher.json", async (req, res) => {
+  const prs = await getOpenPRs();
+  const upstream = await fetch(
+    "https://chunkyupdate.lemaik.de/launcher.json"
+  ).then((res) => res.json());
+  res.json({
+    ...upstream,
+    channels: [
+      ...upstream.channels,
+      ...prs.map((pr) => ({
+        id: `pr-${pr.number}`,
+        name: `PR #${pr.number}`,
+        path: `${pr.number}/pr.json`,
+        notes: pr.title,
+      })),
+    ],
+  });
 });
 app.listen(3000);
