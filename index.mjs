@@ -2,6 +2,12 @@ import express from "express";
 import yauzl from "yauzl";
 import crypto from "node:crypto";
 
+const SNAPSHOT = /2\.5\.0-DEV/;
+const SNAPSHOT_BRANCH = "master";
+
+const STABLE_SNAPSHOT = /2\.4\.\d+-DEV/;
+const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
+
 const token = process.env.GH_TOKEN;
 const headers = new Headers();
 headers.append("Authorization", `token ${token}`);
@@ -21,13 +27,22 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
     // PR not found
     return null;
   }
-  return workflows.workflow_runs.find((run) => {
-    return (
+  return workflows.workflow_runs.find(
+    (run) =>
       run.head_sha === pull.head.sha &&
       run.status === "completed" &&
       run.conclusion === "success"
-    );
-  });
+  );
+};
+
+const getWorkflowRunsForBranch = async (branch) => {
+  const workflows = await fetch(
+    `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=push&branch=${branch}`,
+    { headers }
+  ).then((res) => res.json());
+  return workflows.workflow_runs.find(
+    (run) => run.status === "completed" && run.conclusion === "success"
+  );
 };
 
 const getOpenPRs = () =>
@@ -70,56 +85,7 @@ async function getChunkyCoreJar(run) {
   );
 }
 
-const app = express();
-app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
-  const number =
-    req.params.number || req.params.filename.match(/PR\.(\d+)/)?.[1];
-  if (isNaN(parseInt(number, 10))) {
-    return res.status(400).send("Invalid PR number");
-  }
-  if (
-    req.params.filename.startsWith(`chunky-core-`) &&
-    req.params.filename.includes(`PR.${number}.`)
-  ) {
-    const run = await getWorkflowRunsForPullRequest(number);
-    if (run == null) {
-      return res.status(404).end();
-    }
-    const { entry, zipFile } = await getChunkyCoreJar(run);
-    if (zipFile == null) {
-      return res.status(404).end();
-    }
-
-    zipFile.openReadStream(entry, (err, stream) => {
-      if (err) {
-        return res.status(500).end();
-      }
-      res.header("Content-Length", entry.uncompressedSize);
-      res.header("Content-Type", "application/octet-stream");
-      res.header(
-        "Content-Disposition",
-        `attachment; filename=${entry.fileName}`
-      );
-      stream.pipe(res);
-    });
-  } else {
-    res.redirect(
-      301,
-      `https://chunkyupdate.lemaik.de/lib/${req.params.filename}`
-    );
-  }
-});
-app.get("/:number/pr.json", async (req, res) => {
-  const number = req.params.number;
-  if (isNaN(parseInt(number, 10))) {
-    return res.status(400).send("Invalid PR number");
-  }
-
-  const run = await getWorkflowRunsForPullRequest(number);
-  if (run == null) {
-    return res.status(404).end();
-  }
-
+async function serveJsonForWorkflowRun(run, template, req, res) {
   res.header("Last-Modified", new Date(run.created_at).toUTCString());
   if (new Date(req.header("If-Modified-Since")) >= new Date(run.created_at)) {
     return res.status(304).end();
@@ -140,15 +106,88 @@ app.get("/:number/pr.json", async (req, res) => {
   });
   return res
     .json({
+      ...template,
       name: entry.fileName.replace(/\.jar$/, ""),
       timestamp: run.created_at,
-      notes: `To see what's new in this build, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}/commits`,
       libraries: [
         {
           name: entry.fileName,
           md5: digest,
           size: entry.uncompressedSize,
         },
+        ...template.libraries,
+      ],
+    })
+    .end();
+}
+
+async function serveChunkyCoreJar(run, req, res) {
+  const { entry, zipFile } = await getChunkyCoreJar(run);
+  if (zipFile == null) {
+    return res.status(404).end();
+  }
+
+  zipFile.openReadStream(entry, (err, stream) => {
+    if (err) {
+      return res.status(500).end();
+    }
+    res.header("Content-Length", entry.uncompressedSize);
+    res.header("Content-Type", "application/octet-stream");
+    res.header("Content-Disposition", `attachment; filename=${entry.fileName}`);
+    stream.pipe(res);
+  });
+}
+
+const app = express();
+app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
+  const number =
+    req.params.number || req.params.filename.match(/PR\.(\d+)/)?.[1];
+  if (req.params.filename.startsWith(`chunky-core-`)) {
+    if (req.params.filename.includes(`PR.${number}.`)) {
+      if (isNaN(parseInt(number, 10))) {
+        return res.status(400).send("Invalid PR number");
+      }
+      const run = await getWorkflowRunsForPullRequest(number);
+      if (run == null) {
+        return res.status(404).end();
+      }
+      return serveChunkyCoreJar(run, req, res);
+    } else if (SNAPSHOT.test(req.params.filename)) {
+      const run = await getWorkflowRunsForBranch(SNAPSHOT_BRANCH);
+      if (run == null) {
+        return res.status(404).end();
+      }
+      return serveChunkyCoreJar(run, req, res);
+    } else if (STABLE_SNAPSHOT.test(req.params.filename)) {
+      const run = await getWorkflowRunsForBranch(STABLE_SNAPSHOT_BRANCH);
+      if (run == null) {
+        return res.status(404).end();
+      }
+      return serveChunkyCoreJar(run, req, res);
+    }
+  } else {
+    res.redirect(
+      301,
+      `https://chunkyupdate.lemaik.de/lib/${req.params.filename}`
+    );
+  }
+});
+app.get("/:number/pr.json", async (req, res) => {
+  const number = req.params.number;
+  if (isNaN(parseInt(number, 10))) {
+    return res.status(400).send("Invalid PR number");
+  }
+
+  const run = await getWorkflowRunsForPullRequest(number);
+  if (run == null) {
+    return res.status(404).end();
+  }
+
+  return serveJsonForWorkflowRun(
+    run,
+    {
+      notes: `To see what's new in this build, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}/commits`,
+      libraries: [
         {
           name: "commons-math3-3.2.jar",
           md5: "AAA32530C0F744813570FF73DB018698",
@@ -165,8 +204,10 @@ app.get("/:number/pr.json", async (req, res) => {
           size: 19870806,
         },
       ],
-    })
-    .end();
+    },
+    req,
+    res
+  );
 });
 app.get("/:number/launcher.json", async (req, res) => {
   const upstream = await fetch(
@@ -207,8 +248,36 @@ app.get("/launcher.json", async (req, res) => {
     ],
   });
 });
+app.get("/snapshot.json", async (req, res) => {
+  const run = await getWorkflowRunsForBranch(SNAPSHOT_BRANCH);
+  return serveJsonForWorkflowRun(
+    run,
+    {
+      notes: `To see what's new in this build, please look at\nhttps://github.com/chunky-dev/chunky/commits/${SNAPSHOT_BRANCH}`,
+      libraries: [
+        {
+          name: "commons-math3-3.2.jar",
+          md5: "AAA32530C0F744813570FF73DB018698",
+          size: 1692782,
+        },
+        {
+          name: "gson-2.9.0.jar",
+          md5: "53FA3E6753E90D931D62CB89580FDE2F",
+          size: 249277,
+        },
+        {
+          name: "fastutil-8.4.4.jar",
+          md5: "7D189AD790C996B2C9A7AD076524586C",
+          size: 19870806,
+        },
+      ],
+    },
+    req,
+    res
+  );
+});
 app.get(
-  ["/(latest|snapshot|snapshot-stable).json", "/ChunkyLauncher.jar"],
+  ["/(latest|snapshot-stable).json", "/ChunkyLauncher.jar"],
   (req, res) => {
     res.redirect(307, `https://chunkyupdate.lemaik.de${req.path}`);
   }
