@@ -276,10 +276,30 @@ app.get("/snapshot.json", async (req, res) => {
     res
   );
 });
-app.get(
-  ["/(latest|snapshot-stable).json", "/ChunkyLauncher.jar"],
-  (req, res) => {
-    res.redirect(307, `https://chunkyupdate.lemaik.de${req.path}`);
-  }
-);
+app.get("/snapshot-stable.json", async (req, res) => {
+  const run = await getWorkflowRunsForBranch(STABLE_SNAPSHOT_BRANCH);
+  return serveJsonForWorkflowRun(
+    run,
+    {
+      notes: `To see what's new in this build, please look at\nhttps://github.com/chunky-dev/chunky/commits/${STABLE_SNAPSHOT_BRANCH}`,
+      libraries: [
+        {
+          name: "commons-math3-3.2.jar",
+          md5: "AAA32530C0F744813570FF73DB018698",
+          size: 1692782,
+        },
+        {
+          name: "fastutil-8.4.4.jar",
+          md5: "7D189AD790C996B2C9A7AD076524586C",
+          size: 19870806,
+        },
+      ],
+    },
+    req,
+    res
+  );
+});
+app.get(["/latest.json", "/ChunkyLauncher.jar"], (req, res) => {
+  res.redirect(307, `https://chunkyupdate.lemaik.de${req.path}`);
+});
 app.listen(3000);
