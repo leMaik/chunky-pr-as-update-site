@@ -1,6 +1,7 @@
 import express from "express";
 import yauzl from "yauzl";
 import crypto from "node:crypto";
+import https from "https";
 
 const SNAPSHOT = /2\.5\.0-DEV/;
 const SNAPSHOT_BRANCH = "master";
@@ -166,9 +167,22 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       return serveChunkyCoreJar(run, req, res);
     }
   } else {
-    res.redirect(
-      301,
-      `https://chunkyupdate.lemaik.de/lib/${req.params.filename}`
+    // we use a cdn, so fetching libs from github (instead of redirecting) should be fine
+    https.get(
+      {
+        path: `/chunky-dev/chunky/master/chunky/lib/${req.params.filename}`,
+        hostname: "raw.githubusercontent.com",
+        port: 443,
+      },
+      (upstreamRes) => {
+        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader("Content-Length", upstreamRes.headers["content-length"]);
+        upstreamRes.on("error", (err) => {
+          console.error("Could not download library", err);
+          res.status(500).end();
+        });
+        upstreamRes.pipe(res);
+      }
     );
   }
 });
