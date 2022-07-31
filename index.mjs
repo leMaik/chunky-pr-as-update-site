@@ -51,6 +51,11 @@ const getOpenPRs = () =>
     (res) => res.json()
   );
 
+const getPullRequest = (number) =>
+  fetch(`https://api.github.com/repos/chunky-dev/chunky/pulls/${number}`).then(
+    (res) => res.json()
+  );
+
 async function getChunkyCoreJar(run) {
   const artifacts = await (await fetch(run.artifacts_url, { headers })).json();
   const chunkyBuild = artifacts.artifacts.find((a) => a.name === "Chunky Core");
@@ -192,6 +197,11 @@ app.get("/:number/pr.json", async (req, res) => {
     return res.status(400).send("Invalid PR number");
   }
 
+  const pr = await getPullRequest(number);
+  if (!pr) {
+    return res.status(404).end();
+  }
+
   const run = await getWorkflowRunsForPullRequest(number);
   if (run == null) {
     return res.status(404).end();
@@ -200,7 +210,7 @@ app.get("/:number/pr.json", async (req, res) => {
   return serveJsonForWorkflowRun(
     run,
     {
-      notes: `To see what's new in this build, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}/commits`,
+      notes: `${pr.title}\nAuthor: ${pr.user.login}\n\nTo see what's new in this build and provide feedback, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}`,
       libraries: [
         {
           name: "commons-math3-3.2.jar",
