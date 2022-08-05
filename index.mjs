@@ -3,10 +3,10 @@ import yauzl from "yauzl";
 import crypto from "node:crypto";
 import https from "https";
 
-const SNAPSHOT = /2\.5\.0-DEV/;
+const SNAPSHOT = /2\.5\.0-(DEV|SNAPSHOT)/;
 const SNAPSHOT_BRANCH = "master";
 
-const STABLE_SNAPSHOT = /2\.4\.\d+-DEV/;
+const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
 
 const token = process.env.GH_TOKEN;
