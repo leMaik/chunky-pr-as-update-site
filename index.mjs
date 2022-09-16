@@ -1,7 +1,7 @@
 import express from "express";
 import yauzl from "yauzl";
 import crypto from "node:crypto";
-import https from "https";
+import fetch from "node-fetch";
 
 const SNAPSHOT = /2\.5\.0-(DEV|SNAPSHOT)/;
 const SNAPSHOT_BRANCH = "master";
@@ -170,25 +170,27 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
         return res.status(404).end();
       }
       return serveChunkyCoreJar(run, req, res);
+    } else {
+      // we use a cdn, so fetching libs from github (instead of redirecting) should be fine
+      const match = /chunky-core-(.+?)\.jar/.exec(req.params.filename);
+      if (match) {
+        const version = match[1];
+        const upstreamRes = await fetch(
+          `https://github.com/chunky-dev/chunky/releases/download/${version}/chunky-core-${version}.jar`
+        );
+        upstreamRes.headers.forEach((v, n) => res.setHeader(n, v));
+        upstreamRes.body.pipe(res);
+      } else {
+        res.status(400).end();
+      }
     }
   } else {
     // we use a cdn, so fetching libs from github (instead of redirecting) should be fine
-    https.get(
-      {
-        path: `/chunky-dev/chunky/master/chunky/lib/${req.params.filename}`,
-        hostname: "raw.githubusercontent.com",
-        port: 443,
-      },
-      (upstreamRes) => {
-        res.setHeader("Content-Type", "application/octet-stream");
-        res.setHeader("Content-Length", upstreamRes.headers["content-length"]);
-        upstreamRes.on("error", (err) => {
-          console.error("Could not download library", err);
-          res.status(500).end();
-        });
-        upstreamRes.pipe(res);
-      }
+    const upstreamRes = await fetch(
+      `https://raw.githubusercontent.com/chunky-dev/chunky/master/chunky/lib/${req.params.filename}`
     );
+    upstreamRes.headers.forEach((v, n) => res.setHeader(n, v));
+    upstreamRes.body.pipe(res);
   }
 });
 app.get("/:number/pr.json", async (req, res) => {
