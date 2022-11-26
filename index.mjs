@@ -14,23 +14,23 @@ const headers = new Headers();
 headers.append("Authorization", `token ${token}`);
 
 const getWorkflowRunsForPullRequest = async (pullNumber) => {
-  const [pull, workflows] = await Promise.all([
-    fetch(
+  const pull = await fetch(
       `https://api.github.com/repos/chunky-dev/chunky/pulls/${pullNumber}`,
       { headers }
-    ).then((res) => res.json()),
-    fetch(
-      "https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request",
-      { headers }
-    ).then((res) => res.json()),
-  ]);
+  ).then((res) => res.json());
+
   if (!pull.head) {
     // PR not found
     return null;
   }
+
+  const workflows = await fetch(
+      `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request&head_sha=${pull.head.sha}`,
+      { headers }
+  ).then((res) => res.json());
+
   return workflows.workflow_runs.find(
     (run) =>
-      run.head_sha === pull.head.sha &&
       run.status === "completed" &&
       run.conclusion === "success"
   );
