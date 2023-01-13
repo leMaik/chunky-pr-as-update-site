@@ -16,6 +16,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
       - name: Create new release
         id: release
         env:
