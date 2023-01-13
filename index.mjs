@@ -325,7 +325,7 @@ app.get("/snapshot-stable.json", async (req, res) => {
     res
   );
 });
-app.get(["/latest.json", "/ChunkyLauncher.jar"], (req, res) => {
+app.get(["/latest.json", "/javafx.json", "/ChunkyLauncher.jar"], (req, res) => {
   res.redirect(307, `https://chunkyupdate.lemaik.de${req.path}`);
 });
 app.listen(3000);
