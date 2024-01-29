@@ -215,18 +215,31 @@ app.get("/:number/pr.json", async (req, res) => {
       notes: `${pr.title}\nAuthor: ${pr.user.login}\n\nTo see what's new in this build and provide feedback, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}`,
       libraries: [
         {
+          name: "lz4-java-1.8.0.jar",
+          md5: "936A927700AA8FC3B75D21D7571171F6",
+          sha256:
+            "D74A3334FB35195009B338A951F918203D6BBCA3D1D359033DC33EDD1CADC9EF",
+          size: 682804,
+        },
+        {
           name: "commons-math3-3.2.jar",
           md5: "AAA32530C0F744813570FF73DB018698",
+          sha256:
+            "6268A9A0EA3E769FC493A21446664C0EF668E48C93D126791F6F3F757978FEE2",
           size: 1692782,
         },
         {
           name: "gson-2.9.0.jar",
           md5: "53FA3E6753E90D931D62CB89580FDE2F",
+          sha256:
+            "C96D60551331A196DAC54B745AA642CD078EF89B6F267146B705F2C2CBEF052D",
           size: 249277,
         },
         {
           name: "fastutil-8.4.4.jar",
           md5: "7D189AD790C996B2C9A7AD076524586C",
+          sha256:
+            "3D7981B838C8FE8D8F1EF93C9EE4EBF6BD1091CC1C5847FE41DB22D1648081E3",
           size: 19870806,
         },
       ],
@@ -282,18 +295,31 @@ app.get("/snapshot.json", async (req, res) => {
       notes: `To see what's new in this build, please look at\nhttps://github.com/chunky-dev/chunky/commits/${SNAPSHOT_BRANCH}`,
       libraries: [
         {
+          name: "lz4-java-1.8.0.jar",
+          md5: "936A927700AA8FC3B75D21D7571171F6",
+          sha256:
+            "D74A3334FB35195009B338A951F918203D6BBCA3D1D359033DC33EDD1CADC9EF",
+          size: 682804,
+        },
+        {
           name: "commons-math3-3.2.jar",
           md5: "AAA32530C0F744813570FF73DB018698",
+          sha256:
+            "6268A9A0EA3E769FC493A21446664C0EF668E48C93D126791F6F3F757978FEE2",
           size: 1692782,
         },
         {
           name: "gson-2.9.0.jar",
           md5: "53FA3E6753E90D931D62CB89580FDE2F",
+          sha256:
+            "C96D60551331A196DAC54B745AA642CD078EF89B6F267146B705F2C2CBEF052D",
           size: 249277,
         },
         {
           name: "fastutil-8.4.4.jar",
           md5: "7D189AD790C996B2C9A7AD076524586C",
+          sha256:
+            "3D7981B838C8FE8D8F1EF93C9EE4EBF6BD1091CC1C5847FE41DB22D1648081E3",
           size: 19870806,
         },
       ],
