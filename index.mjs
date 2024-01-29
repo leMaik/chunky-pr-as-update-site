@@ -338,11 +338,15 @@ app.get("/snapshot-stable.json", async (req, res) => {
         {
           name: "commons-math3-3.2.jar",
           md5: "AAA32530C0F744813570FF73DB018698",
+          sha256:
+            "6268A9A0EA3E769FC493A21446664C0EF668E48C93D126791F6F3F757978FEE2",
           size: 1692782,
         },
         {
           name: "fastutil-8.4.4.jar",
           md5: "7D189AD790C996B2C9A7AD076524586C",
+          sha256:
+            "3D7981B838C8FE8D8F1EF93C9EE4EBF6BD1091CC1C5847FE41DB22D1648081E3",
           size: 19870806,
         },
       ],
