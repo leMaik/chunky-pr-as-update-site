@@ -12,6 +12,7 @@
     "digest-stream": "^2.0.0",
     "express": "^5.0.0-beta.1",
     "node-stream-zip": "^1.15.0",
+    "write-file-atomic": "^5.0.1",
     "yauzl": "^2.10.0"
   }
 }

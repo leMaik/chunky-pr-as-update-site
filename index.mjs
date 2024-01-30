@@ -1,12 +1,17 @@
 import express from "express";
-import yauzl from "yauzl";
 import crypto from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import writeFileAtomic from "write-file-atomic";
+import yauzl from "yauzl";
 
 const SNAPSHOT = /2\.5\.0-(DEV|SNAPSHOT)/;
 const SNAPSHOT_BRANCH = "master";
 
 const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
+
+const RUN_ARTIFACTS_PATH = process.env.RUN_ARTIFACTS_PATH ?? "./run_artifacts";
 
 const token = process.env.GH_TOKEN;
 if (!token) {
@@ -58,37 +63,58 @@ const getPullRequest = (number) =>
   }).then((res) => res.json());
 
 async function getChunkyCoreJar(run) {
-  const artifacts = await (await fetch(run.artifacts_url, { headers })).json();
-  const chunkyBuild = artifacts.artifacts.find((a) => a.name === "Chunky Core");
-  if (!chunkyBuild) {
-    return {};
-  }
+  const artifactCachePath = join(RUN_ARTIFACTS_PATH, `${run.id}.zip`);
+  let zipBuffer;
+  let fromCache = false;
+  try {
+    const cachedZipFile = await readFile(artifactCachePath);
+    zipBuffer = cachedZipFile;
+    fromCache = true;
+  } catch {}
 
-  const body = await fetch(chunkyBuild.archive_download_url, { headers }).then(
-    (res) => res.arrayBuffer()
-  );
+  if (!zipBuffer) {
+    const artifacts = await fetch(run.artifacts_url, { headers }).then((res) =>
+      res.json()
+    );
+    const chunkyBuild = artifacts.artifacts.find(
+      (a) => a.name === "Chunky Core"
+    );
+    if (!chunkyBuild) {
+      return {};
+    }
+
+    const res = await fetch(chunkyBuild.archive_download_url, { headers });
+    if (!res.ok) {
+      return {};
+    }
+    const body = await res.arrayBuffer();
+    zipBuffer = Buffer.from(body, "binary");
+  }
 
   /**
    * @type yauzl.ZipFile
    */
   const zipFile = await new Promise((resolve, reject) =>
-    yauzl.fromBuffer(
-      Buffer.from(body, "binary"),
-      { lazyEntries: true },
-      (err, zipFile) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(zipFile);
-        }
+    yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipFile) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(zipFile);
       }
-    )
+    })
   );
   zipFile.readEntry();
   return new Promise((resolve) =>
-    zipFile.on("entry", (entry) =>
-      resolve({ zipFile, entry, run: run[0], artifact: chunkyBuild })
-    )
+    zipFile.on("entry", (entry) => {
+      if (!fromCache) {
+        writeFileAtomic(artifactCachePath, zipBuffer, { mode: 0o444 }).catch(
+          (e) => {
+            console.error(`caching artifacts of run ${run.id} failed`, e);
+          }
+        );
+      }
+      resolve({ zipFile, entry, run: run[0] });
+    })
   );
 }
 
