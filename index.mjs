@@ -1,7 +1,6 @@
 import express from "express";
 import yauzl from "yauzl";
 import crypto from "node:crypto";
-import fetch from "node-fetch";
 
 const SNAPSHOT = /2\.5\.0-(DEV|SNAPSHOT)/;
 const SNAPSHOT_BRANCH = "master";
@@ -49,14 +48,14 @@ const getWorkflowRunsForBranch = async (branch) => {
 };
 
 const getOpenPRs = () =>
-  fetch("https://api.github.com/repos/chunky-dev/chunky/pulls?state=open").then(
-    (res) => res.json()
-  );
+  fetch("https://api.github.com/repos/chunky-dev/chunky/pulls?state=open", {
+    headers,
+  }).then((res) => res.json());
 
 const getPullRequest = (number) =>
-  fetch(`https://api.github.com/repos/chunky-dev/chunky/pulls/${number}`).then(
-    (res) => res.json()
-  );
+  fetch(`https://api.github.com/repos/chunky-dev/chunky/pulls/${number}`, {
+    headers,
+  }).then((res) => res.json());
 
 async function getChunkyCoreJar(run) {
   const artifacts = await (await fetch(run.artifacts_url, { headers })).json();
