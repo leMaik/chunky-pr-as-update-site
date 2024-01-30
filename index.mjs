@@ -15,8 +15,8 @@ headers.append("Authorization", `token ${token}`);
 
 const getWorkflowRunsForPullRequest = async (pullNumber) => {
   const pull = await fetch(
-      `https://api.github.com/repos/chunky-dev/chunky/pulls/${pullNumber}`,
-      { headers }
+    `https://api.github.com/repos/chunky-dev/chunky/pulls/${pullNumber}`,
+    { headers }
   ).then((res) => res.json());
 
   if (!pull.head) {
@@ -25,14 +25,12 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
   }
 
   const workflows = await fetch(
-      `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request&head_sha=${pull.head.sha}`,
-      { headers }
+    `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request&head_sha=${pull.head.sha}`,
+    { headers }
   ).then((res) => res.json());
 
   return workflows.workflow_runs.find(
-    (run) =>
-      run.status === "completed" &&
-      run.conclusion === "success"
+    (run) => run.status === "completed" && run.conclusion === "success"
   );
 };
 
@@ -102,14 +100,24 @@ async function serveJsonForWorkflowRun(run, template, req, res) {
     return res.status(404).end();
   }
 
-  const digest = await new Promise((resolve) => {
-    zipFile.openReadStream(entry, (err, stream) => {
-      const hash = crypto.createHash("md5");
-      hash.setEncoding("hex");
-      stream.on("finish", () => resolve(hash.read().toUpperCase()));
-      stream.pipe(hash);
-    });
-  });
+  const [md5Digest, sha256Digest] = await Promise.all([
+    new Promise((resolve) => {
+      zipFile.openReadStream(entry, (err, stream) => {
+        const hash = crypto.createHash("md5");
+        hash.setEncoding("hex");
+        stream.on("finish", () => resolve(hash.read().toUpperCase()));
+        stream.pipe(hash);
+      });
+    }),
+    new Promise((resolve) => {
+      zipFile.openReadStream(entry, (err, stream) => {
+        const hash = crypto.createHash("sha256");
+        hash.setEncoding("hex");
+        stream.on("finish", () => resolve(hash.read().toUpperCase()));
+        stream.pipe(hash);
+      });
+    }),
+  ]);
   return res
     .json({
       ...template,
@@ -118,7 +126,8 @@ async function serveJsonForWorkflowRun(run, template, req, res) {
       libraries: [
         {
           name: entry.fileName,
-          md5: digest,
+          md5: md5Digest,
+          sha256: sha256Digest,
           size: entry.uncompressedSize,
         },
         ...template.libraries,
