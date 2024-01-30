@@ -10,6 +10,10 @@ const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
 
 const token = process.env.GH_TOKEN;
+if (!token) {
+  console.error("GH_TOKEN not specified!");
+  process.exit(1);
+}
 const headers = new Headers();
 headers.append("Authorization", `token ${token}`);
 
