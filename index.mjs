@@ -126,7 +126,13 @@ async function serveJsonForWorkflowRun(run, template, req, res) {
 
   const { entry, zipFile } = await getChunkyCoreJar(run);
   if (zipFile == null) {
-    return res.status(404).end();
+    return res
+      .status(404)
+      .json({
+        status: 404,
+        message: "chunky-core artifact not found in workflow run",
+      })
+      .end();
   }
 
   const [md5Digest, sha256Digest] = await Promise.all([
@@ -168,12 +174,21 @@ async function serveJsonForWorkflowRun(run, template, req, res) {
 async function serveChunkyCoreJar(run, req, res) {
   const { entry, zipFile } = await getChunkyCoreJar(run);
   if (zipFile == null) {
-    return res.status(404).end();
+    return res
+      .status(404)
+      .json({
+        status: 404,
+        message: "chunky-core artifact not found in workflow run",
+      })
+      .end();
   }
 
   zipFile.openReadStream(entry, (err, stream) => {
     if (err) {
-      return res.status(500).end();
+      return res
+        .status(500)
+        .json({ code: 500, message: "failed to read artifact zip file" })
+        .end();
     }
     res.header("Content-Length", entry.uncompressedSize);
     res.header("Content-Type", "application/octet-stream");
@@ -189,23 +204,35 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
   if (req.params.filename.startsWith(`chunky-core-`)) {
     if (req.params.filename.includes(`PR.${number}.`)) {
       if (isNaN(parseInt(number, 10))) {
-        return res.status(400).send("Invalid PR number");
+        return res
+          .status(400)
+          .json({ code: 400, message: "invalid pr number" })
+          .end();
       }
       const run = await getWorkflowRunsForPullRequest(number);
       if (run == null) {
-        return res.status(404).end();
+        return res
+          .status(404)
+          .json({ code: 404, message: "workflow run not found" })
+          .end();
       }
       return serveChunkyCoreJar(run, req, res);
     } else if (SNAPSHOT.test(req.params.filename)) {
       const run = await getWorkflowRunsForBranch(SNAPSHOT_BRANCH);
       if (run == null) {
-        return res.status(404).end();
+        return res
+          .status(404)
+          .json({ code: 404, message: "workflow run not found" })
+          .end();
       }
       return serveChunkyCoreJar(run, req, res);
     } else if (STABLE_SNAPSHOT.test(req.params.filename)) {
       const run = await getWorkflowRunsForBranch(STABLE_SNAPSHOT_BRANCH);
       if (run == null) {
-        return res.status(404).end();
+        return res
+          .status(404)
+          .json({ code: 404, message: "workflow run not found" })
+          .end();
       }
       return serveChunkyCoreJar(run, req, res);
     } else {
@@ -219,7 +246,10 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
         upstreamRes.headers.forEach((v, n) => res.setHeader(n, v));
         upstreamRes.body.pipe(res);
       } else {
-        res.status(400).end();
+        res
+          .status(400)
+          .json({ code: 400, message: "unexpected chunky-core filename" })
+          .end();
       }
     }
   } else {
@@ -234,17 +264,26 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
 app.get("/:number/pr.json", async (req, res) => {
   const number = req.params.number;
   if (isNaN(parseInt(number, 10))) {
-    return res.status(400).send("Invalid PR number");
+    return res
+      .status(400)
+      .json({ code: 400, message: "invalid pr number" })
+      .end();
   }
 
   const pr = await getPullRequest(number);
   if (!pr) {
-    return res.status(404).end();
+    return res
+      .status(404)
+      .json({ code: 404, message: "pull request not found" })
+      .end();
   }
 
   const run = await getWorkflowRunsForPullRequest(number);
   if (run == null) {
-    return res.status(404).end();
+    return res
+      .status(404)
+      .json({ code: 404, message: "workflow run not found" })
+      .end();
   }
 
   return serveJsonForWorkflowRun(
