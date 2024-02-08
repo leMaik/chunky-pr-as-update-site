@@ -11,6 +11,10 @@ const SNAPSHOT_BRANCH = "master";
 const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
 
+const NO_PR_HOSTNAME = process.env.NO_PR_HOSTNAME ?? "chunkyupdate.lemaik.de";
+const STATIC_UPSTREAM =
+  process.env.STATIC_UPSTREAM ?? "https://static.chunkyupdate.lemaik.de";
+
 const RUN_ARTIFACTS_PATH = process.env.RUN_ARTIFACTS_PATH ?? "./run_artifacts";
 
 const token = process.env.GH_TOKEN;
@@ -326,9 +330,9 @@ app.get("/:number/pr.json", async (req, res) => {
   );
 });
 app.get("/:number/launcher.json", async (req, res) => {
-  const upstream = await fetch(
-    "https://chunkyupdate.lemaik.de/launcher.json"
-  ).then((res) => res.json());
+  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
+    res.json()
+  );
   res.header("Last-Modified", new Date(upstream.timestamp));
   res.json({
     ...upstream,
@@ -344,13 +348,19 @@ app.get("/:number/launcher.json", async (req, res) => {
   });
 });
 app.get("/:number/:filename", (req, res) => {
-  res.redirect(301, `https://chunkyupdate.lemaik.de/${req.params.filename}`);
+  res.redirect(301, `${STATIC_UPSTREAM}/${req.params.filename}`);
 });
 app.get("/launcher.json", async (req, res) => {
+  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
+    res.json()
+  );
+
+  if (req.hostname === NO_PR_HOSTNAME) {
+    res.json(upstream);
+    return;
+  }
+
   const prs = await getOpenPRs();
-  const upstream = await fetch(
-    "https://chunkyupdate.lemaik.de/launcher.json"
-  ).then((res) => res.json());
   res.json({
     ...upstream,
     channels: [
@@ -433,6 +443,6 @@ app.get("/snapshot-stable.json", async (req, res) => {
   );
 });
 app.get(["/latest.json", "/javafx.json", "/ChunkyLauncher.jar"], (req, res) => {
-  res.redirect(307, `https://chunkyupdate.lemaik.de${req.path}`);
+  res.redirect(307, `${STATIC_UPSTREAM}/${req.path}`);
 });
 app.listen(3000);
