@@ -445,4 +445,9 @@ app.get("/snapshot-stable.json", async (req, res) => {
 app.get(["/latest.json", "/javafx.json", "/ChunkyLauncher.jar"], (req, res) => {
   res.redirect(307, `${STATIC_UPSTREAM}/${req.path}`);
 });
+if (process.env.REDIRECT_ROOT) {
+  app.get("/", (req, res) => {
+    res.redirect(301, process.env.REDIRECT_ROOT);
+  });
+}
 app.listen(3000);
