@@ -247,8 +247,19 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
         const upstreamRes = await fetch(
           `https://github.com/chunky-dev/chunky/releases/download/${version}/chunky-core-${version}.jar`
         );
-        upstreamRes.headers.forEach((v, n) => res.setHeader(n, v));
-        upstreamRes.body.pipe(res);
+        if (!upstreamRes.ok) {
+          return res
+            .status(500)
+            .json({
+              code: 500,
+              message: "release artifact could not be fetched",
+            })
+            .end();
+        }
+        ["content-type", "last-modified", "etag", "content-length"].forEach(
+          (header) => res.setHeader(header, upstreamRes.headers.get(header))
+        );
+        return pipeReadableStreamToResponse(upstreamRes.body, res);
       } else {
         res
           .status(400)
@@ -261,8 +272,19 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
     const upstreamRes = await fetch(
       `https://raw.githubusercontent.com/chunky-dev/chunky/master/chunky/lib/${req.params.filename}`
     );
-    upstreamRes.headers.forEach((v, n) => res.setHeader(n, v));
-    upstreamRes.body.pipe(res);
+    if (!upstreamRes.ok) {
+      return res
+        .status(500)
+        .json({
+          code: 500,
+          message: "library could not be fetched",
+        })
+        .end();
+    }
+    ["content-type", "last-modified", "etag", "content-length"].forEach(
+      (header) => res.setHeader(header, upstreamRes.headers.get(header))
+    );
+    return pipeReadableStreamToResponse(upstreamRes.body, res);
   }
 });
 app.get("/:number/pr.json", async (req, res) => {
@@ -451,3 +473,19 @@ if (process.env.REDIRECT_ROOT) {
   });
 }
 app.listen(3000);
+
+async function pipeReadableStreamToResponse(readableStream, res) {
+  const reader = readableStream.getReader();
+  for await (const chunk of readChunks(reader)) {
+    res.write(chunk);
+  }
+  res.end();
+}
+
+async function* readChunks(reader) {
+  let readResult = await reader.read();
+  while (!readResult.done) {
+    yield readResult.value;
+    readResult = await reader.read();
+  }
+}
