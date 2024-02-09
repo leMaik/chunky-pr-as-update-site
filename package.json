@@ -1,6 +1,6 @@
 {
   "name": "chunky-pr-as-update-site",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "",
   "main": "index.mjs",
   "scripts": {
