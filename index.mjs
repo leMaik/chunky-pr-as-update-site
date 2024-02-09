@@ -13,7 +13,7 @@ const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
 
 const NO_PR_HOSTNAME = process.env.NO_PR_HOSTNAME ?? "chunkyupdate.lemaik.de";
 const STATIC_UPSTREAM =
-  process.env.STATIC_UPSTREAM ?? "https://static.chunkyupdate.lemaik.de";
+  process.env.STATIC_UPSTREAM ?? "https://chunkyfiles.lemaik.de";
 
 const RUN_ARTIFACTS_PATH = process.env.RUN_ARTIFACTS_PATH ?? "./run_artifacts";
 
