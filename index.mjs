@@ -465,7 +465,9 @@ app.get("/snapshot-stable.json", async (req, res) => {
   );
 });
 app.get(["/latest.json", "/javafx.json", "/ChunkyLauncher.jar"], (req, res) => {
-  res.redirect(307, `${STATIC_UPSTREAM}${req.path}`);
+  // NOTE: ChunkyLauncher didn't support 307/308 redirects before v1.14.1
+  // see https://github.com/chunky-dev/chunky/pull/1711
+  res.redirect(302, `${STATIC_UPSTREAM}${req.path}`);
 });
 if (process.env.REDIRECT_ROOT) {
   app.get("/", (req, res) => {
