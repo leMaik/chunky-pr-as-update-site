@@ -320,23 +320,7 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       }
     }
   } else {
-    // we use a cdn, so fetching libs from github (instead of redirecting) should be fine
-    const upstreamRes = await fetch(
-      `https://raw.githubusercontent.com/chunky-dev/chunky/master/chunky/lib/${req.params.filename}`
-    );
-    if (!upstreamRes.ok) {
-      return res
-        .status(500)
-        .json({
-          code: 500,
-          message: "library could not be fetched",
-        })
-        .end();
-    }
-    ["content-type", "last-modified", "etag", "content-length"].forEach(
-      (header) => res.setHeader(header, upstreamRes.headers.get(header))
-    );
-    return pipeReadableStreamToResponse(upstreamRes.body, res);
+    res.redirect(302, `${STATIC_UPSTREAM}${req.path}`);
   }
 });
 app.get("/:number/pr.json", async (req, res) => {
