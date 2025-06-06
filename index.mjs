@@ -108,10 +108,20 @@ const getWorkflowRunsForBranch = async (branch) => {
   );
 };
 
-const getOpenPRs = () =>
-  fetch("https://api.github.com/repos/chunky-dev/chunky/pulls?state=open", {
-    headers,
-  }).then((res) => res.json());
+async function* getOpenPRs() {
+  let next = "https://api.github.com/repos/chunky-dev/chunky/pulls?state=open";
+  while (next != null) {
+    const res = await fetch(next, { headers });
+    yield* await res.json();
+    const linkHeader = res.headers.get("link");
+    if (linkHeader) {
+      const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+      next = match ? match[1] : null;
+    } else {
+      next = null;
+    }
+  }
+}
 
 const getPullRequest = (number) =>
   fetch(`https://api.github.com/repos/chunky-dev/chunky/pulls/${number}`, {
@@ -389,7 +399,10 @@ app.get("/launcher.json", async (req, res) => {
     return;
   }
 
-  const prs = await getOpenPRs();
+  const prs = [];
+  for await (const pr of getOpenPRs()) {
+    prs.push(pr);
+  }
   res.json({
     ...upstream,
     channels: [
