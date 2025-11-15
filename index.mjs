@@ -63,6 +63,16 @@ const STABLE_SNAPSHOT_LIBRARIES = [
   },
 ];
 
+/**
+ * Overrides default library downloads. Libraries listed here are fetched
+ * from a random URL in the provided list instead of STATIC_UPSTREAM.
+ */
+const LIBRARY_DOWNLOADS = {
+  "fastutil-8.4.4.jar": [
+    "https://maven-central.storage.googleapis.com/maven2/it/unimi/dsi/fastutil/8.4.4/fastutil-8.4.4.jar",
+  ],
+};
+
 const NO_PR_HOSTNAME = process.env.NO_PR_HOSTNAME ?? "chunkyupdate.lemaik.de";
 const STATIC_UPSTREAM =
   process.env.STATIC_UPSTREAM ?? "https://chunkyfiles.lemaik.de";
@@ -330,7 +340,12 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       }
     }
   } else {
-    res.redirect(302, `${STATIC_UPSTREAM}${req.path}`);
+    const library = LIBRARY_DOWNLOADS[req.params.filename];
+    if (library) {
+      res.redirect(302, library[Math.floor(Math.random() * library.length)]);
+    } else {
+      res.redirect(302, `${STATIC_UPSTREAM}${req.path}`);
+    }
   }
 });
 app.get("/:number/pr.json", async (req, res) => {
