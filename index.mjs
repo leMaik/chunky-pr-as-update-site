@@ -108,7 +108,7 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
   );
 };
 
-const getWorkflowRunsForBranch = async (branch) => {
+const getWorkflowRunForBranch = async (branch) => {
   const workflows = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=push&branch=${branch}`,
     { headers }
@@ -294,7 +294,7 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       }
       return serveChunkyCoreJar(run, req, res);
     } else if (SNAPSHOT.test(req.params.filename)) {
-      const run = await getWorkflowRunsForBranch(SNAPSHOT_BRANCH);
+      const run = await getWorkflowRunForBranch(SNAPSHOT_BRANCH);
       if (run == null) {
         return res
           .status(404)
@@ -303,7 +303,7 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       }
       return serveChunkyCoreJar(run, req, res);
     } else if (STABLE_SNAPSHOT.test(req.params.filename)) {
-      const run = await getWorkflowRunsForBranch(STABLE_SNAPSHOT_BRANCH);
+      const run = await getWorkflowRunForBranch(STABLE_SNAPSHOT_BRANCH);
       if (run == null) {
         return res
           .status(404)
@@ -369,7 +369,11 @@ app.get("/:number/pr.json", async (req, res) => {
   if (run == null) {
     return res
       .status(404)
-      .json({ code: 404, message: "workflow run not found" })
+      .json({
+        code: 404,
+        message:
+          "workflow run not found (probably expired, ask the maintainers to trigger a new one)",
+      })
       .end();
   }
 
@@ -432,7 +436,18 @@ app.get("/launcher.json", async (req, res) => {
   });
 });
 app.get("/snapshot.json", async (req, res) => {
-  const run = await getWorkflowRunsForBranch(SNAPSHOT_BRANCH);
+  const run = await getWorkflowRunForBranch(SNAPSHOT_BRANCH);
+  if (run == null) {
+    return res
+      .status(500)
+      .json({
+        code: 500,
+        message:
+          "workflow run not found (probably expired, ask the maintainers to trigger a new one)",
+      })
+      .end();
+  }
+
   return serveJsonForWorkflowRun(
     run,
     {
@@ -444,7 +459,18 @@ app.get("/snapshot.json", async (req, res) => {
   );
 });
 app.get("/snapshot-stable.json", async (req, res) => {
-  const run = await getWorkflowRunsForBranch(STABLE_SNAPSHOT_BRANCH);
+  const run = await getWorkflowRunForBranch(STABLE_SNAPSHOT_BRANCH);
+  if (run == null) {
+    return res
+      .status(500)
+      .json({
+        code: 500,
+        message:
+          "workflow run not found (probably expired, ask the maintainers to trigger a new one)",
+      })
+      .end();
+  }
+
   return serveJsonForWorkflowRun(
     run,
     {
