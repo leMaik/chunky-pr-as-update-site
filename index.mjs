@@ -274,6 +274,7 @@ async function serveChunkyCoreJar(run, req, res) {
 }
 
 const app = express();
+app.disable("x-powered-by");
 app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
   const number =
     req.params.number || req.params.filename.match(/PR\.(\d+)/)?.[1];
