@@ -491,7 +491,15 @@ if (process.env.REDIRECT_ROOT) {
     res.redirect(301, process.env.REDIRECT_ROOT);
   });
 }
-app.listen(3000);
+
+const port = 3000;
+app.listen(port, (err) => {
+  if (err) {
+    console.error(`Failed to bind port ${port}`, err);
+    process.exit(-1);
+  }
+  console.log(`Server started, listening on port ${port}`);
+});
 
 async function pipeReadableStreamToResponse(readableStream, res) {
   const reader = readableStream.getReader();
