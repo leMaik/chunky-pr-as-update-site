@@ -44,7 +44,25 @@ const SNAPSHOT_LIBRARIES = [
     sha256: "86E0255D4C879C61B4833ED7F13124E8BB679DF47DEBB127326E7DB7DD49A07B",
     size: 269335,
   },
+  {},
+  {},
 ];
+
+const BEDROCK_SUPPORT_PR="1906"
+const BEDROCK_SUPPORT_LIBRARIES = [
+  {
+    name: "leveldb-ffi-0.1.0-20260727.163118-2.jar",
+    md5: "151A37B164E79CF214975DC753905B43",
+    sha256: "80C20EBD18B6E1DDBB3DC43E9ACC70117A3241428FBC8CC4B711C35086650E5E",
+    size: 2987382,
+  },
+  {
+    name: "nbt-3.0.0.Final.jar",
+    md5: "12CE392B20E7D79B283E9E5C23EB4029",
+    sha256: "58E97D2208922DAA8EAF98277A6A1125C09BEAD2B2777441DECFC40377474603",
+    size: 44207,
+  },
+]
 
 const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
@@ -90,7 +108,7 @@ headers.append("Authorization", `token ${token}`);
 const getWorkflowRunsForPullRequest = async (pullNumber) => {
   const pull = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/pulls/${pullNumber}`,
-    { headers }
+    { headers },
   ).then((res) => res.json());
 
   if (!pull.head) {
@@ -100,21 +118,21 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
 
   const workflows = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request&head_sha=${pull.head.sha}`,
-    { headers }
+    { headers },
   ).then((res) => res.json());
 
   return workflows.workflow_runs.find(
-    (run) => run.status === "completed" && run.conclusion === "success"
+    (run) => run.status === "completed" && run.conclusion === "success",
   );
 };
 
 const getWorkflowRunForBranch = async (branch) => {
   const workflows = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=push&branch=${branch}`,
-    { headers }
+    { headers },
   ).then((res) => res.json());
   return workflows.workflow_runs.find(
-    (run) => run.status === "completed" && run.conclusion === "success"
+    (run) => run.status === "completed" && run.conclusion === "success",
   );
 };
 
@@ -150,10 +168,10 @@ async function getChunkyCoreJar(run) {
 
   if (!zipBuffer) {
     const artifacts = await fetch(run.artifacts_url, { headers }).then((res) =>
-      res.json()
+      res.json(),
     );
     const chunkyBuild = artifacts.artifacts.find(
-      (a) => a.name === "Chunky Core"
+      (a) => a.name === "Chunky Core",
     );
     if (!chunkyBuild) {
       return {};
@@ -177,7 +195,7 @@ async function getChunkyCoreJar(run) {
       } else {
         resolve(zipFile);
       }
-    })
+    }),
   );
   zipFile.readEntry();
   return new Promise((resolve) =>
@@ -186,11 +204,11 @@ async function getChunkyCoreJar(run) {
         writeFileAtomic(artifactCachePath, zipBuffer, { mode: 0o444 }).catch(
           (e) => {
             console.error(`caching artifacts of run ${run.id} failed`, e);
-          }
+          },
         );
       }
       resolve({ zipFile, entry, run: run[0] });
-    })
+    }),
   );
 }
 
@@ -318,7 +336,7 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
       if (match) {
         const version = match[1];
         const upstreamRes = await fetch(
-          `https://github.com/chunky-dev/chunky/releases/download/${version}/chunky-core-${version}.jar`
+          `https://github.com/chunky-dev/chunky/releases/download/${version}/chunky-core-${version}.jar`,
         );
         if (!upstreamRes.ok) {
           return res
@@ -330,7 +348,7 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
             .end();
         }
         ["content-type", "last-modified", "etag", "content-length"].forEach(
-          (header) => res.setHeader(header, upstreamRes.headers.get(header))
+          (header) => res.setHeader(header, upstreamRes.headers.get(header)),
         );
         return pipeReadableStreamToResponse(upstreamRes.body, res);
       } else {
@@ -382,15 +400,18 @@ app.get("/:number/pr.json", async (req, res) => {
     run,
     {
       notes: `${pr.title}\nAuthor: ${pr.user.login}\n\nTo see what's new in this build and provide feedback, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}`,
-      libraries: SNAPSHOT_LIBRARIES,
+      libraries:
+        number === BEDROCK_SUPPORT_PR
+          ? [...SNAPSHOT_LIBRARIES, ...BEDROCK_SUPPORT_LIBRARIES]
+          : SNAPSHOT_LIBRARIES,
     },
     req,
-    res
+    res,
   );
 });
 app.get("/:number/launcher.json", async (req, res) => {
   const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
-    res.json()
+    res.json(),
   );
   res.header("Last-Modified", new Date(upstream.timestamp));
   res.json({
@@ -411,7 +432,7 @@ app.get("/:number/:filename", (req, res) => {
 });
 app.get("/launcher.json", async (req, res) => {
   const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
-    res.json()
+    res.json(),
   );
 
   if (req.hostname === NO_PR_HOSTNAME) {
@@ -456,7 +477,7 @@ app.get("/snapshot.json", async (req, res) => {
       libraries: SNAPSHOT_LIBRARIES,
     },
     req,
-    res
+    res,
   );
 });
 app.get("/snapshot-stable.json", async (req, res) => {
@@ -479,7 +500,7 @@ app.get("/snapshot-stable.json", async (req, res) => {
       libraries: STABLE_SNAPSHOT_LIBRARIES,
     },
     req,
-    res
+    res,
   );
 });
 app.get(["/latest.json", "/javafx.json", "/ChunkyLauncher.jar"], (req, res) => {
