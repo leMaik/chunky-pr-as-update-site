@@ -1,4 +1,5 @@
 import express from "express";
+import { XMLParser } from "fast-xml-parser";
 import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -48,11 +49,36 @@ const SNAPSHOT_LIBRARIES = [
 
 const BEDROCK_SUPPORT_PR = "1906";
 const BEDROCK_SUPPORT_LIBRARIES = [
-  {
-    name: "leveldb-ffi-0.1.0-20260727.163118-2.jar",
-    md5: "151A37B164E79CF214975DC753905B43",
-    sha256: "80C20EBD18B6E1DDBB3DC43E9ACC70117A3241428FBC8CC4B711C35086650E5E",
-    size: 2987382,
+  async () => {
+    const leveldbFfiVersion = "0.1.0-SNAPSHOT";
+    const metadata = await fetch(
+      `https://central.sonatype.com/repository/maven-snapshots/io/github/notstirred/leveldb-ffi/${leveldbFfiVersion}/maven-metadata.xml`,
+    ).then((res) => res.text());
+    const parser = new XMLParser();
+    const parsed = parser.parse(metadata);
+    const snapshot =
+      parsed.metadata.versioning.snapshotVersions.snapshotVersion.find(
+        (v) => v.extension === "jar",
+      );
+    if (!snapshot) {
+      throw new Error(
+        "Failed to parse leveldb-ffi snapshot version from maven metadata",
+      );
+    }
+    const jarUrl = `https://central.sonatype.com/repository/maven-snapshots/io/github/notstirred/leveldb-ffi/${leveldbFfiVersion}/leveldb-ffi-${snapshot.value}.jar`;
+    const [md5, sha256, size] = await Promise.all([
+      fetch(`${jarUrl}.md5`).then((res) => res.text()),
+      fetch(`${jarUrl}.sha256`).then((res) => res.text()),
+      fetch(jarUrl, { method: "HEAD" }).then((res) =>
+        parseInt(res.headers.get("content-length"), 10),
+      ),
+    ]);
+    return {
+      name: `leveldb-ffi-${snapshot.value}.jar`,
+      md5: md5.toUpperCase(),
+      sha256: sha256.toUpperCase(),
+      size,
+    };
   },
   {
     name: "nbt-3.0.0.Final.jar",
@@ -60,7 +86,7 @@ const BEDROCK_SUPPORT_LIBRARIES = [
     sha256: "58E97D2208922DAA8EAF98277A6A1125C09BEAD2B2777441DECFC40377474603",
     size: 44207,
   },
-]
+];
 
 const STABLE_SNAPSHOT = /2\.4\.\d+-(DEV|SNAPSHOT)/;
 const STABLE_SNAPSHOT_BRANCH = "chunky-2.4.x";
@@ -210,10 +236,18 @@ async function getChunkyCoreJar(run) {
   );
 }
 
-async function serveJsonForWorkflowRun(run, template, req, res) {
-  res.header("Last-Modified", new Date(run.created_at).toUTCString());
-  if (new Date(req.header("If-Modified-Since")) >= new Date(run.created_at)) {
-    return res.status(304).end();
+async function serveJsonForWorkflowRun(
+  run,
+  template,
+  req,
+  res,
+  forceRefetch = false,
+) {
+  if (!forceRefetch) {
+    res.header("Last-Modified", new Date(run.created_at).toUTCString());
+    if (new Date(req.header("If-Modified-Since")) >= new Date(run.created_at)) {
+      return res.status(304).end();
+    }
   }
 
   const { entry, zipFile } = await getChunkyCoreJar(run);
@@ -356,6 +390,11 @@ app.get(["/:number/lib/:filename", "/lib/:filename"], async (req, res) => {
           .end();
       }
     }
+  } else if (/leveldb-ffi-(.+?)\.jar/.test(req.params.filename)) {
+    res.redirect(
+      302,
+      `https://central.sonatype.com/repository/maven-snapshots/io/github/notstirred/leveldb-ffi/0.1.0-SNAPSHOT/${req.params.filename}`,
+    );
   } else {
     const library = LIBRARY_DOWNLOADS[req.params.filename];
     if (library) {
@@ -400,11 +439,19 @@ app.get("/:number/pr.json", async (req, res) => {
       notes: `${pr.title}\nAuthor: ${pr.user.login}\n\nTo see what's new in this build and provide feedback, please look at \nhttps://github.com/chunky-dev/chunky/pull/${number}`,
       libraries:
         number === BEDROCK_SUPPORT_PR
-          ? [...SNAPSHOT_LIBRARIES, ...BEDROCK_SUPPORT_LIBRARIES]
+          ? [
+              ...SNAPSHOT_LIBRARIES,
+              ...(await Promise.all(
+                BEDROCK_SUPPORT_LIBRARIES.map((library) =>
+                  typeof library === "function" ? library() : library,
+                ),
+              )),
+            ]
           : SNAPSHOT_LIBRARIES,
     },
     req,
     res,
+    number === BEDROCK_SUPPORT_PR,
   );
 });
 app.get("/:number/launcher.json", async (req, res) => {

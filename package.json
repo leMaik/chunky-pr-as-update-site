@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "express": "^5.1.0",
+    "fast-xml-parser": "^5.10.1",
     "write-file-atomic": "^6.0.0",
     "yauzl": "^3.2.0"
   }
