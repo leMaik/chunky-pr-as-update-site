@@ -121,6 +121,32 @@ const STATIC_UPSTREAM =
 
 const RUN_ARTIFACTS_PATH = process.env.RUN_ARTIFACTS_PATH ?? "./run_artifacts";
 
+async function assertOkJsonResponse(res) {
+  const context = `${res.url} (HTTP ${res.status} ${res.statusText})`;
+  let body;
+  try {
+    body = await res.text();
+  } catch (e) {
+    const message = `Failed to read response: ${context}`;
+    console.error(message, e);
+    throw new Error(message, { cause: e });
+  }
+
+  if (!res.ok) {
+    const message = `Upstream request failed: ${context}`;
+    console.error(message, body);
+    throw new Error(message);
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch (cause) {
+    const message = `Invalid JSON response: ${context}`;
+    console.error(message, body);
+    throw new Error(message, { cause });
+  }
+}
+
 const token = process.env.GH_TOKEN;
 if (!token) {
   console.error("GH_TOKEN not specified!");
@@ -133,7 +159,7 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
   const pull = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/pulls/${pullNumber}`,
     { headers },
-  ).then((res) => res.json());
+  ).then(assertOkJsonResponse);
 
   if (!pull.head) {
     // PR not found
@@ -143,7 +169,7 @@ const getWorkflowRunsForPullRequest = async (pullNumber) => {
   const workflows = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=pull_request&head_sha=${pull.head.sha}`,
     { headers },
-  ).then((res) => res.json());
+  ).then(assertOkJsonResponse);
 
   return workflows.workflow_runs.find(
     (run) => run.status === "completed" && run.conclusion === "success",
@@ -154,7 +180,7 @@ const getWorkflowRunForBranch = async (branch) => {
   const workflows = await fetch(
     `https://api.github.com/repos/chunky-dev/chunky/actions/runs?event=push&branch=${branch}`,
     { headers },
-  ).then((res) => res.json());
+  ).then(assertOkJsonResponse);
   return workflows.workflow_runs.find(
     (run) => run.status === "completed" && run.conclusion === "success",
   );
@@ -164,7 +190,7 @@ async function* getOpenPRs() {
   let next = "https://api.github.com/repos/chunky-dev/chunky/pulls?state=open";
   while (next != null) {
     const res = await fetch(next, { headers });
-    yield* await res.json();
+    yield* await assertOkJsonResponse(res);
     const linkHeader = res.headers.get("link");
     if (linkHeader) {
       const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
@@ -178,7 +204,7 @@ async function* getOpenPRs() {
 const getPullRequest = (number) =>
   fetch(`https://api.github.com/repos/chunky-dev/chunky/pulls/${number}`, {
     headers,
-  }).then((res) => res.json());
+  }).then(assertOkJsonResponse);
 
 async function getChunkyCoreJar(run) {
   const artifactCachePath = join(RUN_ARTIFACTS_PATH, `${run.id}.zip`);
@@ -191,8 +217,8 @@ async function getChunkyCoreJar(run) {
   } catch {}
 
   if (!zipBuffer) {
-    const artifacts = await fetch(run.artifacts_url, { headers }).then((res) =>
-      res.json(),
+    const artifacts = await fetch(run.artifacts_url, { headers }).then(
+      assertOkJsonResponse,
     );
     const chunkyBuild = artifacts.artifacts.find(
       (a) => a.name === "Chunky Core",
@@ -455,8 +481,8 @@ app.get("/:number/pr.json", async (req, res) => {
   );
 });
 app.get("/:number/launcher.json", async (req, res) => {
-  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
-    res.json(),
+  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then(
+    assertOkJsonResponse,
   );
   res.header("Last-Modified", new Date(upstream.timestamp));
   res.json({
@@ -476,8 +502,8 @@ app.get("/:number/:filename", (req, res) => {
   res.redirect(301, `${STATIC_UPSTREAM}/${req.params.filename}`);
 });
 app.get("/launcher.json", async (req, res) => {
-  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then((res) =>
-    res.json(),
+  const upstream = await fetch(`${STATIC_UPSTREAM}/launcher.json`).then(
+    assertOkJsonResponse,
   );
 
   if (req.hostname === NO_PR_HOSTNAME) {
